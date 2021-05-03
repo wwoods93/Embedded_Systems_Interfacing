@@ -1,0 +1,615 @@
+Disassembly Listing for HW2
+Generated From:
+/Users/wilsonwoods/MPLABXProjects/HW2/HW2.X/dist/default/debug/HW2.X.debug.elf
+Aug 31, 2020 10:50:33 AM
+
+---  /Users/wilsonwoods/MPLABXProjects/HW2/HW2.X/mcc_generated_files/traps.c  ---------------------------
+1:                 /**
+2:                   System Traps Generated Driver File 
+3:                 
+4:                   @Company:
+5:                     Microchip Technology Inc.
+6:                 
+7:                   @File Name:
+8:                     traps.h
+9:                 
+10:                  @Summary:
+11:                    This is the generated driver implementation file for handling traps
+12:                    using PIC24 / dsPIC33 / PIC32MM MCUs
+13:                
+14:                  @Description:
+15:                    This source file provides implementations for PIC24 / dsPIC33 / PIC32MM MCUs traps.
+16:                    Generation Information : 
+17:                        Product Revision  :  PIC24 / dsPIC33 / PIC32MM MCUs - 1.168.0
+18:                        Device            :  PIC24FJ128GA010
+19:                    The generated drivers are tested against the following:
+20:                        Compiler          :  XC16 v1.50
+21:                        MPLAB             :  MPLAB X v5.40
+22:                */
+23:                /*
+24:                    (c) 2020 Microchip Technology Inc. and its subsidiaries. You may use this
+25:                    software and any derivatives exclusively with Microchip products.
+26:                
+27:                    THIS SOFTWARE IS SUPPLIED BY MICROCHIP "AS IS". NO WARRANTIES, WHETHER
+28:                    EXPRESS, IMPLIED OR STATUTORY, APPLY TO THIS SOFTWARE, INCLUDING ANY IMPLIED
+29:                    WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY, AND FITNESS FOR A
+30:                    PARTICULAR PURPOSE, OR ITS INTERACTION WITH MICROCHIP PRODUCTS, COMBINATION
+31:                    WITH ANY OTHER PRODUCTS, OR USE IN ANY APPLICATION.
+32:                
+33:                    IN NO EVENT WILL MICROCHIP BE LIABLE FOR ANY INDIRECT, SPECIAL, PUNITIVE,
+34:                    INCIDENTAL OR CONSEQUENTIAL LOSS, DAMAGE, COST OR EXPENSE OF ANY KIND
+35:                    WHATSOEVER RELATED TO THE SOFTWARE, HOWEVER CAUSED, EVEN IF MICROCHIP HAS
+36:                    BEEN ADVISED OF THE POSSIBILITY OR THE DAMAGES ARE FORESEEABLE. TO THE
+37:                    FULLEST EXTENT ALLOWED BY LAW, MICROCHIP'S TOTAL LIABILITY ON ALL CLAIMS IN
+38:                    ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
+39:                    THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
+40:                
+41:                    MICROCHIP PROVIDES THIS SOFTWARE CONDITIONALLY UPON YOUR ACCEPTANCE OF THESE
+42:                    TERMS.
+43:                */
+44:                
+45:                /**
+46:                    Section: Includes
+47:                */
+48:                #include <xc.h>
+49:                #include "traps.h"
+50:                
+51:                #define ERROR_HANDLER __attribute__((interrupt,no_auto_psv))
+52:                #define FAILSAFE_STACK_GUARDSIZE 8
+53:                
+54:                /**
+55:                 * a private place to store the error code if we run into a severe error
+56:                 */
+57:                static uint16_t TRAPS_error_code = -1;
+58:                
+59:                /**
+60:                 * Halts 
+61:                 * 
+62:                 * @param code error code
+63:                 */
+64:                void __attribute__((weak)) TRAPS_halt_on_error(uint16_t code)
+65:                {
+0003C4  FA0002     LNK #0x2
+0003C6  780F00     MOV W0, [W14]
+66:                    TRAPS_error_code = code;
+0003C8  78009E     MOV [W14], W1
+0003CA  884281     MOV W1, 0x850
+0003CC  DA4000     BREAK
+67:                #ifdef __DEBUG    
+68:                    __builtin_software_breakpoint();
+69:                    /* If we are in debug mode, cause a software breakpoint in the debugger */
+70:                #endif
+71:                    while(1);
+0003CE  37FFFF     BRA .L2
+72:                    
+73:                }
+74:                
+75:                /**
+76:                 * Sets the stack pointer to a backup area of memory, in case we run into
+77:                 * a stack error (in which case we can't really trust the stack pointer)
+78:                 */
+79:                inline static void use_failsafe_stack(void)
+80:                {
+0003D0  FA0000     LNK #0x0
+81:                    static uint8_t failsafe_stack[32];
+82:                    asm volatile (
+0003D2  208520     MOV #0x852, W0
+0003D4  780780     MOV W0, W15
+83:                        "   mov    %[pstack], W15\n"
+84:                        :
+85:                        : [pstack]"r"(failsafe_stack)
+86:                    );
+87:                /* Controls where the stack pointer limit is, relative to the end of the
+88:                 * failsafe stack
+89:                 */    
+90:                    SPLIM = (uint16_t)(((uint8_t *)failsafe_stack) + sizeof(failsafe_stack) 
+0003D6  2086A0     MOV #0x86A, W0
+0003D8  880100     MOV W0, SPLIM
+91:                            - FAILSAFE_STACK_GUARDSIZE);
+92:                }
+0003DA  FA8000     ULNK
+0003DC  060000     RETURN
+93:                
+94:                /** Oscillator Fail Trap Vector**/
+95:                void ERROR_HANDLER _OscillatorFail(void)
+96:                {
+0002C8  F80036     PUSH RCOUNT
+0002CA  BE9F80     MOV.D W0, [W15++]
+0002CC  BE9F82     MOV.D W2, [W15++]
+0002CE  BE9F84     MOV.D W4, [W15++]
+0002D0  BE9F86     MOV.D W6, [W15++]
+0002D2  FA0000     LNK #0x0
+97:                    INTCON1bits.OSCFAIL = 0;  //Clear the trap flag
+0002D4  A92080     BCLR INTCON1, #1
+98:                    TRAPS_halt_on_error(TRAPS_OSC_FAIL);
+0002D6  EB0000     CLR W0
+0002D8  070075     RCALL TRAPS_halt_on_error
+99:                }
+0002DA  FA8000     ULNK
+0002DC  BE034F     MOV.D [--W15], W6
+0002DE  BE024F     MOV.D [--W15], W4
+0002E0  BE014F     MOV.D [--W15], W2
+0002E2  BE004F     MOV.D [--W15], W0
+0002E4  F90036     POP RCOUNT
+0002E6  064000     RETFIE
+100:               /** Stack Error Trap Vector**/
+101:               void ERROR_HANDLER _StackError(void)
+102:               {
+0002E8  F80036     PUSH RCOUNT
+0002EA  BE9F80     MOV.D W0, [W15++]
+0002EC  BE9F82     MOV.D W2, [W15++]
+0002EE  BE9F84     MOV.D W4, [W15++]
+0002F0  BE9F86     MOV.D W6, [W15++]
+0002F2  FA0000     LNK #0x0
+103:                   /* We use a failsafe stack: the presence of a stack-pointer error
+104:                    * means that we cannot trust the stack to operate correctly unless
+105:                    * we set the stack pointer to a safe place.
+106:                    */
+107:                   use_failsafe_stack(); 
+0002F4  07006D     RCALL use_failsafe_stack
+108:                   INTCON1bits.STKERR = 0;  //Clear the trap flag
+0002F6  A94080     BCLR INTCON1, #2
+109:                   TRAPS_halt_on_error(TRAPS_STACK_ERR);
+0002F8  200010     MOV #0x1, W0
+0002FA  070064     RCALL TRAPS_halt_on_error
+110:               }
+0002FC  FA8000     ULNK
+0002FE  BE034F     MOV.D [--W15], W6
+000300  BE024F     MOV.D [--W15], W4
+000302  BE014F     MOV.D [--W15], W2
+000304  BE004F     MOV.D [--W15], W0
+000306  F90036     POP RCOUNT
+000308  064000     RETFIE
+111:               /** Address Error Trap Vector**/
+112:               void ERROR_HANDLER _AddressError(void)
+113:               {
+00030A  F80036     PUSH RCOUNT
+00030C  BE9F80     MOV.D W0, [W15++]
+00030E  BE9F82     MOV.D W2, [W15++]
+000310  BE9F84     MOV.D W4, [W15++]
+000312  BE9F86     MOV.D W6, [W15++]
+000314  FA0000     LNK #0x0
+114:                   INTCON1bits.ADDRERR = 0;  //Clear the trap flag
+000316  A96080     BCLR INTCON1, #3
+115:                   TRAPS_halt_on_error(TRAPS_ADDRESS_ERR);
+000318  200020     MOV #0x2, W0
+00031A  070054     RCALL TRAPS_halt_on_error
+116:               }
+00031C  FA8000     ULNK
+00031E  BE034F     MOV.D [--W15], W6
+000320  BE024F     MOV.D [--W15], W4
+000322  BE014F     MOV.D [--W15], W2
+000324  BE004F     MOV.D [--W15], W0
+000326  F90036     POP RCOUNT
+000328  064000     RETFIE
+117:               /** Math Error Trap Vector**/
+118:               void ERROR_HANDLER _MathError(void)
+119:               {
+00032A  F80036     PUSH RCOUNT
+00032C  BE9F80     MOV.D W0, [W15++]
+00032E  BE9F82     MOV.D W2, [W15++]
+000330  BE9F84     MOV.D W4, [W15++]
+000332  BE9F86     MOV.D W6, [W15++]
+000334  FA0000     LNK #0x0
+120:                   INTCON1bits.MATHERR = 0;  //Clear the trap flag
+000336  A98080     BCLR INTCON1, #4
+121:                   TRAPS_halt_on_error(TRAPS_MATH_ERR);
+000338  200030     MOV #0x3, W0
+00033A  070044     RCALL TRAPS_halt_on_error
+122:               }
+00033C  FA8000     ULNK
+00033E  BE034F     MOV.D [--W15], W6
+000340  BE024F     MOV.D [--W15], W4
+000342  BE014F     MOV.D [--W15], W2
+000344  BE004F     MOV.D [--W15], W0
+000346  F90036     POP RCOUNT
+000348  064000     RETFIE
+---  /Users/wilsonwoods/MPLABXProjects/HW2/HW2.X/mcc_generated_files/system.c  --------------------------
+1:                 /**
+2:                   @Generated PIC24 / dsPIC33 / PIC32MM MCUs Source File
+3:                 
+4:                   @Company:
+5:                     Microchip Technology Inc.
+6:                 
+7:                   @File Name:
+8:                     system.h
+9:                 
+10:                  @Summary:
+11:                    This is the sysetm.h file generated using PIC24 / dsPIC33 / PIC32MM MCUs
+12:                
+13:                  @Description:
+14:                    This header file provides implementations for driver APIs for all modules selected in the GUI.
+15:                    Generation Information :
+16:                        Product Revision  :  PIC24 / dsPIC33 / PIC32MM MCUs - 1.168.0
+17:                        Device            :  PIC24FJ128GA010
+18:                    The generated drivers are tested against the following:
+19:                        Compiler          :  XC16 v1.50
+20:                        MPLAB             :  MPLAB X v5.40
+21:                */
+22:                
+23:                /*
+24:                    (c) 2020 Microchip Technology Inc. and its subsidiaries. You may use this
+25:                    software and any derivatives exclusively with Microchip products.
+26:                
+27:                    THIS SOFTWARE IS SUPPLIED BY MICROCHIP "AS IS". NO WARRANTIES, WHETHER
+28:                    EXPRESS, IMPLIED OR STATUTORY, APPLY TO THIS SOFTWARE, INCLUDING ANY IMPLIED
+29:                    WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY, AND FITNESS FOR A
+30:                    PARTICULAR PURPOSE, OR ITS INTERACTION WITH MICROCHIP PRODUCTS, COMBINATION
+31:                    WITH ANY OTHER PRODUCTS, OR USE IN ANY APPLICATION.
+32:                
+33:                    IN NO EVENT WILL MICROCHIP BE LIABLE FOR ANY INDIRECT, SPECIAL, PUNITIVE,
+34:                    INCIDENTAL OR CONSEQUENTIAL LOSS, DAMAGE, COST OR EXPENSE OF ANY KIND
+35:                    WHATSOEVER RELATED TO THE SOFTWARE, HOWEVER CAUSED, EVEN IF MICROCHIP HAS
+36:                    BEEN ADVISED OF THE POSSIBILITY OR THE DAMAGES ARE FORESEEABLE. TO THE
+37:                    FULLEST EXTENT ALLOWED BY LAW, MICROCHIP'S TOTAL LIABILITY ON ALL CLAIMS IN
+38:                    ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
+39:                    THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
+40:                
+41:                    MICROCHIP PROVIDES THIS SOFTWARE CONDITIONALLY UPON YOUR ACCEPTANCE OF THESE
+42:                    TERMS.
+43:                */
+44:                
+45:                // Configuration bits: selected in the GUI
+46:                
+47:                // CONFIG2
+48:                #pragma config POSCMOD = XT    //Primary Oscillator Select->XT Oscillator mode selected
+49:                #pragma config OSCIOFNC = ON    //Primary Oscillator Output Function->OSC2/CLKO/RC15 functions as port I/O (RC15)
+50:                #pragma config FCKSM = CSDCMD    //Clock Switching and Monitor->Clock switching and Fail-Safe Clock Monitor are disabled
+51:                #pragma config FNOSC = PRIPLL    //Oscillator Select->Primary Oscillator with PLL module (HSPLL, ECPLL)
+52:                #pragma config IESO = ON    //Internal External Switch Over Mode->IESO mode (Two-Speed Start-up) enabled
+53:                
+54:                // CONFIG1
+55:                #pragma config WDTPS = PS32768    //Watchdog Timer Postscaler->1:32768
+56:                #pragma config FWPSA = PR128    //WDT Prescaler->Prescaler ratio of 1:128
+57:                #pragma config WINDIS = ON    //Watchdog Timer Window->Standard Watchdog Timer enabled,(Windowed-mode is disabled)
+58:                #pragma config FWDTEN = OFF    //Watchdog Timer Enable->Watchdog Timer is disabled
+59:                #pragma config ICS = PGx2    //Comm Channel Select->Emulator/debugger uses EMUC2/EMUD2
+60:                #pragma config BKBUG = OFF    //Background Debug->Device resets into Operational mode
+61:                #pragma config GWRP = OFF    //General Code Segment Write Protect->Writes to program memory are allowed
+62:                #pragma config GCP = OFF    //General Code Segment Code Protect->Code protection is disabled
+63:                #pragma config JTAGEN = OFF    //JTAG Port Enable->JTAG port is disabled
+64:                
+65:                #include "pin_manager.h"
+66:                #include "clock.h"
+67:                #include "system.h"
+68:                #include "interrupt_manager.h"
+69:                #include "traps.h"
+70:                
+71:                void SYSTEM_Initialize(void)
+72:                {
+000400  FA0000     LNK #0x0
+73:                    PIN_MANAGER_Initialize();
+000402  07FFA6     RCALL PIN_MANAGER_Initialize
+74:                    INTERRUPT_Initialize();
+000404  070003     RCALL INTERRUPT_Initialize
+75:                    CLOCK_Initialize();
+000406  07FFC7     RCALL CLOCK_Initialize
+76:                }
+000408  FA8000     ULNK
+00040A  060000     RETURN
+77:                
+78:                /**
+79:                 End of File
+80:                */
+---  /Users/wilsonwoods/MPLABXProjects/HW2/HW2.X/mcc_generated_files/pin_manager.c  ---------------------
+1:                 /**
+2:                   PIN MANAGER Generated Driver File
+3:                 
+4:                   @Company:
+5:                     Microchip Technology Inc.
+6:                 
+7:                   @File Name:
+8:                     pin_manager.c
+9:                 
+10:                  @Summary:
+11:                    This is the generated manager file for the PIC24 / dsPIC33 / PIC32MM MCUs device.  This manager
+12:                    configures the pins direction, initial state, analog setting.
+13:                
+14:                  @Description:
+15:                    This source file provides implementations for PIN MANAGER.
+16:                    Generation Information :
+17:                        Product Revision  :  PIC24 / dsPIC33 / PIC32MM MCUs - 1.168.0
+18:                        Device            :  PIC24FJ128GA010
+19:                    The generated drivers are tested against the following:
+20:                        Compiler          :  XC16 v1.50
+21:                        MPLAB 	          :  MPLAB X v5.40
+22:                */
+23:                
+24:                /*
+25:                    (c) 2020 Microchip Technology Inc. and its subsidiaries. You may use this
+26:                    software and any derivatives exclusively with Microchip products.
+27:                
+28:                    THIS SOFTWARE IS SUPPLIED BY MICROCHIP "AS IS". NO WARRANTIES, WHETHER
+29:                    EXPRESS, IMPLIED OR STATUTORY, APPLY TO THIS SOFTWARE, INCLUDING ANY IMPLIED
+30:                    WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY, AND FITNESS FOR A
+31:                    PARTICULAR PURPOSE, OR ITS INTERACTION WITH MICROCHIP PRODUCTS, COMBINATION
+32:                    WITH ANY OTHER PRODUCTS, OR USE IN ANY APPLICATION.
+33:                
+34:                    IN NO EVENT WILL MICROCHIP BE LIABLE FOR ANY INDIRECT, SPECIAL, PUNITIVE,
+35:                    INCIDENTAL OR CONSEQUENTIAL LOSS, DAMAGE, COST OR EXPENSE OF ANY KIND
+36:                    WHATSOEVER RELATED TO THE SOFTWARE, HOWEVER CAUSED, EVEN IF MICROCHIP HAS
+37:                    BEEN ADVISED OF THE POSSIBILITY OR THE DAMAGES ARE FORESEEABLE. TO THE
+38:                    FULLEST EXTENT ALLOWED BY LAW, MICROCHIP'S TOTAL LIABILITY ON ALL CLAIMS IN
+39:                    ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
+40:                    THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
+41:                
+42:                    MICROCHIP PROVIDES THIS SOFTWARE CONDITIONALLY UPON YOUR ACCEPTANCE OF THESE
+43:                    TERMS.
+44:                */
+45:                
+46:                
+47:                /**
+48:                    Section: Includes
+49:                */
+50:                
+51:                #include <xc.h>
+52:                #include <stdio.h>
+53:                #include "pin_manager.h"
+54:                
+55:                /**
+56:                 Section: Driver Interface Function Definitions
+57:                */
+58:                void PIN_MANAGER_Initialize (void)
+59:                {
+000350  FA0000     LNK #0x0
+60:                    /****************************************************************************
+61:                     * Setting the Output Latch SFR(s)
+62:                     ***************************************************************************/
+63:                    LATA = 0x0000;
+000352  EF22C4     CLR LATA
+64:                    LATB = 0x0000;
+000354  EF22CA     CLR LATB
+65:                    LATC = 0x0000;
+000356  EF22D0     CLR LATC
+66:                    LATD = 0x0000;
+000358  EF22D6     CLR LATD
+67:                    LATE = 0x0000;
+00035A  EF22DC     CLR LATE
+68:                    LATF = 0x0000;
+00035C  EF22E2     CLR LATF
+69:                    LATG = 0x0000;
+00035E  EF22E8     CLR LATG
+70:                
+71:                    /****************************************************************************
+72:                     * Setting the GPIO Direction SFR(s)
+73:                     ***************************************************************************/
+74:                    TRISA = 0xC6FF;
+000360  2C6FF0     MOV #0xC6FF, W0
+000362  881600     MOV W0, TRISA
+75:                    TRISB = 0xFFFF;
+000364  EB8000     SETM W0
+000366  881630     MOV W0, TRISB
+76:                    TRISC = 0x701E;
+000368  2701E0     MOV #0x701E, W0
+00036A  881660     MOV W0, TRISC
+77:                    TRISD = 0xFFFF;
+00036C  EB8000     SETM W0
+00036E  881690     MOV W0, TRISD
+78:                    TRISE = 0x03FF;
+000370  203FF0     MOV #0x3FF, W0
+000372  8816C0     MOV W0, TRISE
+79:                    TRISF = 0x31FF;
+000374  231FF0     MOV #0x31FF, W0
+000376  8816F0     MOV W0, TRISF
+80:                    TRISG = 0xF3CF;
+000378  2F3CF0     MOV #0xF3CF, W0
+00037A  881720     MOV W0, TRISG
+81:                
+82:                    /****************************************************************************
+83:                     * Setting the Weak Pull Up and Weak Pull Down SFR(s)
+84:                     ***************************************************************************/
+85:                    CNPU1 = 0x0000;
+00037C  EF2068     CLR CNPU1
+86:                    CNPU2 = 0x0000;
+00037E  EF206A     CLR CNPU2
+87:                
+88:                    /****************************************************************************
+89:                     * Setting the Open Drain SFR(s)
+90:                     ***************************************************************************/
+91:                    ODCA = 0x0000;
+000380  EF26C0     CLR ODCA
+92:                    ODCB = 0x0000;
+000382  EF26C6     CLR ODCB
+93:                    ODCC = 0x0000;
+000384  EF26CC     CLR ODCC
+94:                    ODCD = 0x0000;
+000386  EF26D2     CLR ODCD
+95:                    ODCE = 0x0000;
+000388  EF26D8     CLR ODCE
+96:                    ODCF = 0x0000;
+00038A  EF26DE     CLR ODCF
+97:                    ODCG = 0x0000;
+00038C  EF26E4     CLR ODCG
+98:                
+99:                    /****************************************************************************
+100:                    * Setting the Analog/Digital Configuration SFR(s)
+101:                    ***************************************************************************/
+102:                   AD1PCFG = 0x00C0;
+00038E  200C00     MOV #0xC0, W0
+000390  881960     MOV W0, AD1PCFG
+103:               }
+000392  FA8000     ULNK
+000394  060000     RETURN
+104:               
+---  /Users/wilsonwoods/MPLABXProjects/HW2/HW2.X/mcc_generated_files/interrupt_manager.c  ---------------
+1:                 /**
+2:                   System Interrupts Generated Driver File 
+3:                 
+4:                   @Company:
+5:                     Microchip Technology Inc.
+6:                 
+7:                   @File Name:
+8:                     interrupt_manager.h
+9:                 
+10:                  @Summary:
+11:                    This is the generated driver implementation file for setting up the
+12:                    interrupts using PIC24 / dsPIC33 / PIC32MM MCUs
+13:                
+14:                  @Description:
+15:                    This source file provides implementations for PIC24 / dsPIC33 / PIC32MM MCUs interrupts.
+16:                    Generation Information : 
+17:                        Product Revision  :  PIC24 / dsPIC33 / PIC32MM MCUs - 1.168.0
+18:                        Device            :  PIC24FJ128GA010
+19:                    The generated drivers are tested against the following:
+20:                        Compiler          :  XC16 v1.50
+21:                        MPLAB             :  MPLAB X v5.40
+22:                */
+23:                /*
+24:                    (c) 2020 Microchip Technology Inc. and its subsidiaries. You may use this
+25:                    software and any derivatives exclusively with Microchip products.
+26:                
+27:                    THIS SOFTWARE IS SUPPLIED BY MICROCHIP "AS IS". NO WARRANTIES, WHETHER
+28:                    EXPRESS, IMPLIED OR STATUTORY, APPLY TO THIS SOFTWARE, INCLUDING ANY IMPLIED
+29:                    WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY, AND FITNESS FOR A
+30:                    PARTICULAR PURPOSE, OR ITS INTERACTION WITH MICROCHIP PRODUCTS, COMBINATION
+31:                    WITH ANY OTHER PRODUCTS, OR USE IN ANY APPLICATION.
+32:                
+33:                    IN NO EVENT WILL MICROCHIP BE LIABLE FOR ANY INDIRECT, SPECIAL, PUNITIVE,
+34:                    INCIDENTAL OR CONSEQUENTIAL LOSS, DAMAGE, COST OR EXPENSE OF ANY KIND
+35:                    WHATSOEVER RELATED TO THE SOFTWARE, HOWEVER CAUSED, EVEN IF MICROCHIP HAS
+36:                    BEEN ADVISED OF THE POSSIBILITY OR THE DAMAGES ARE FORESEEABLE. TO THE
+37:                    FULLEST EXTENT ALLOWED BY LAW, MICROCHIP'S TOTAL LIABILITY ON ALL CLAIMS IN
+38:                    ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
+39:                    THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
+40:                
+41:                    MICROCHIP PROVIDES THIS SOFTWARE CONDITIONALLY UPON YOUR ACCEPTANCE OF THESE
+42:                    TERMS.
+43:                */
+44:                
+45:                /**
+46:                    Section: Includes
+47:                */
+48:                #include <xc.h>
+49:                
+50:                /**
+51:                    void INTERRUPT_Initialize (void)
+52:                */
+53:                void INTERRUPT_Initialize (void)
+54:                {
+00040C  FA0000     LNK #0x0
+55:                
+56:                }
+00040E  FA8000     ULNK
+000410  060000     RETURN
+---  /Users/wilsonwoods/MPLABXProjects/HW2/HW2.X/mcc_generated_files/clock.c  ---------------------------
+1:                 /**
+2:                   @Generated PIC24 / dsPIC33 / PIC32MM MCUs Source File
+3:                 
+4:                   @Company:
+5:                     Microchip Technology Inc.
+6:                 
+7:                   @File Name:
+8:                     clock.c
+9:                 
+10:                  @Summary:
+11:                    This is the clock.c file generated using PIC24 / dsPIC33 / PIC32MM MCUs
+12:                
+13:                  @Description:
+14:                    This header file provides implementations for driver APIs for all modules selected in the GUI.
+15:                    Generation Information :
+16:                        Product Revision  :  PIC24 / dsPIC33 / PIC32MM MCUs - 1.168.0
+17:                        Device            :  PIC24FJ128GA010
+18:                    The generated drivers are tested against the following:
+19:                        Compiler          :  XC16 v1.50
+20:                        MPLAB             :  MPLAB X v5.40
+21:                */
+22:                
+23:                /*
+24:                    (c) 2020 Microchip Technology Inc. and its subsidiaries. You may use this
+25:                    software and any derivatives exclusively with Microchip products.
+26:                
+27:                    THIS SOFTWARE IS SUPPLIED BY MICROCHIP "AS IS". NO WARRANTIES, WHETHER
+28:                    EXPRESS, IMPLIED OR STATUTORY, APPLY TO THIS SOFTWARE, INCLUDING ANY IMPLIED
+29:                    WARRANTIES OF NON-INFRINGEMENT, MERCHANTABILITY, AND FITNESS FOR A
+30:                    PARTICULAR PURPOSE, OR ITS INTERACTION WITH MICROCHIP PRODUCTS, COMBINATION
+31:                    WITH ANY OTHER PRODUCTS, OR USE IN ANY APPLICATION.
+32:                
+33:                    IN NO EVENT WILL MICROCHIP BE LIABLE FOR ANY INDIRECT, SPECIAL, PUNITIVE,
+34:                    INCIDENTAL OR CONSEQUENTIAL LOSS, DAMAGE, COST OR EXPENSE OF ANY KIND
+35:                    WHATSOEVER RELATED TO THE SOFTWARE, HOWEVER CAUSED, EVEN IF MICROCHIP HAS
+36:                    BEEN ADVISED OF THE POSSIBILITY OR THE DAMAGES ARE FORESEEABLE. TO THE
+37:                    FULLEST EXTENT ALLOWED BY LAW, MICROCHIP'S TOTAL LIABILITY ON ALL CLAIMS IN
+38:                    ANY WAY RELATED TO THIS SOFTWARE WILL NOT EXCEED THE AMOUNT OF FEES, IF ANY,
+39:                    THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS SOFTWARE.
+40:                
+41:                    MICROCHIP PROVIDES THIS SOFTWARE CONDITIONALLY UPON YOUR ACCEPTANCE OF THESE
+42:                    TERMS.
+43:                */
+44:                
+45:                #include <stdint.h>
+46:                #include "xc.h"
+47:                #include "clock.h"
+48:                
+49:                void CLOCK_Initialize(void)
+50:                {
+000396  FA0000     LNK #0x0
+51:                    // RCDIV FRC/2; DOZE 1:8; DOZEN disabled; ROI disabled; 
+52:                    CLKDIV = 0x3100;
+000398  231000     MOV #0x3100, W0
+00039A  883A20     MOV W0, CLKDIV
+53:                    // TUN Center frequency; 
+54:                    OSCTUN = 0x00;
+00039C  EF2748     CLR OSCTUN
+55:                    // ADC1MD enabled; T3MD enabled; T4MD enabled; T1MD enabled; U2MD enabled; T2MD enabled; U1MD enabled; SPI2MD enabled; SPI1MD enabled; T5MD enabled; I2C1MD enabled; 
+56:                    PMD1 = 0x00;
+00039E  EF2770     CLR PMD1
+57:                    // OC5MD enabled; IC5MD enabled; IC4MD enabled; IC3MD enabled; OC1MD enabled; IC2MD enabled; OC2MD enabled; IC1MD enabled; OC3MD enabled; OC4MD enabled; 
+58:                    PMD2 = 0x00;
+0003A0  EF2772     CLR PMD2
+59:                    // PMPMD enabled; RTCCMD enabled; CMPMD enabled; CRCPMD enabled; I2C2MD enabled; 
+60:                    PMD3 = 0x00;
+0003A2  EF2774     CLR PMD3
+61:                    // NOSC PRIPLL; SOSCEN disabled; OSWEN Switch is Complete; 
+62:                    __builtin_write_OSCCONH((uint8_t) (0x03));
+0003A4  200032     MOV #0x3, W2
+0003A6  200780     MOV #0x78, W0
+0003A8  2009A1     MOV #0x9A, W1
+0003AA  207433     MOV #0x743, W3
+0003AC  784980     MOV.B W0, [W3]
+0003AE  784981     MOV.B W1, [W3]
+0003B0  784982     MOV.B W2, [W3]
+63:                    __builtin_write_OSCCONL((uint8_t) (0x00));
+0003B2  EB0100     CLR W2
+0003B4  200460     MOV #0x46, W0
+0003B6  200571     MOV #0x57, W1
+0003B8  207423     MOV #0x742, W3
+0003BA  784980     MOV.B W0, [W3]
+0003BC  784981     MOV.B W1, [W3]
+0003BE  784982     MOV.B W2, [W3]
+64:                }
+0003C0  FA8000     ULNK
+0003C2  060000     RETURN
+---  /Users/wilsonwoods/MPLABXProjects/HW2/HW2.X/main.c  ------------------------------------------------
+1:                 /**
+2:                  * Embedded Systems Interfacing
+3:                  * Homework #2
+4:                  * Wilson Woods
+5:                  * 8.31.2020
+6:                 */
+7:                 
+8:                 #include "mcc_generated_files/system.h"
+9:                 
+10:                int main(void)
+11:                {
+0003DE  FA0000     LNK #0x0
+12:                    // initialize the device
+13:                    SYSTEM_Initialize();
+0003E0  07000F     RCALL SYSTEM_Initialize
+14:                    TRISB = 0;                  // Set all port B pins as output
+0003E2  EF22C6     CLR TRISB
+15:                    AD1PCFG = 0xffff;           // Set all port B pins as digital
+0003E4  EB8000     SETM W0
+0003E6  881960     MOV W0, AD1PCFG
+16:                
+17:                    while (1)
+18:                    {
+19:                        PORTB = 0xff;           // toggle high
+0003E8  200FF0     MOV #0xFF, W0
+0003EA  881640     MOV W0, PORTB
+20:                        PORTB = 0x00;           // toggle low
+0003EC  EF22C8     CLR PORTB
+21:                    }
+0003EE  37FFFC     BRA .L2
+22:                
+23:                    return 1;
+24:                }
