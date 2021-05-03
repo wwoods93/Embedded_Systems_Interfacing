@@ -20,6 +20,5 @@ int main(void)
         PORTB = 0xff;           // toggle high
         PORTB = 0x00;           // toggle low
     }
-
     return 1;
 }

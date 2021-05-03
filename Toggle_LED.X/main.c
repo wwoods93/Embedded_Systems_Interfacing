@@ -16,12 +16,11 @@ int main(void)
 
     while (1)
     {
-        if (PORTDbits.RD6 == 0 && PORTDbits.RD13 == 0)  // check both buttons
-            PORTA = 0xff;                               // All LEDs on
+        if ( PORTDbits.RD6 == 0 && PORTDbits.RD13 == 0 )  // check both buttons
+            PORTA = 0xff;                                 // All LEDs on
         else
-            PORTA = 0x00;                               // All LEDs off
+            PORTA = 0x00;                                 // All LEDs off
     }
-
     return 1;
 }
 
